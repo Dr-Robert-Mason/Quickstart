@@ -1,0 +1,105 @@
+---
+title: "tidy coral analysis"
+author: "Robert Mason"
+date: "19/06/2019"
+output: html_document
+---
+
+```{r setup, warning=FALSE,message=FALSE}
+#install libraries
+library(tidyverse) #install.packages('tidyverse') #include install.packages(x) as courtesy to those users who need to quickly install the package.
+library(janitor) # install.packages("janitor")
+library(skimr) #install.packages("skimr")
+library(stringr)#install.packages("stringr")
+
+## benthic data
+benthic_url <- 'https://www.nodc.noaa.gov/archive/arc0054/0104255/1.1/data/0-data/cd08/100308OaAla03m.CSV'
+
+## buoy data
+buoy_url <- 'http://www.ndbc.noaa.gov/view_text_file.php?filename=mokh1h2010.txt.gz&dir=data/historical/stdmet/'
+```
+
+```{r benthic raw}
+benthic_raw<-read_csv(benthic_url)
+```
+
+# Wrangle time
+
+```{r}
+benthic<-benthic_raw%>%
+  janitor::clean_names() # use package::function on functions that are not immediately clear to you as to their source package (memory aid, and also unmasks the function if it is masked)
+
+```
+
+```{r}
+benthic<-
+  benthic%>%
+  select(id_name,point,x,y,id_date)%>%
+mutate(date= stringr::str_remove_all(id_date,"#"))
+
+benthic
+
+skimr::skim(benthic)
+unique(benthic$date)
+unique(benthic$id_name)
+
+ggplot(benthic,aes(date,fill=id_name))+geom_bar()
+```
+
+#Buoy Data
+
+```{r buoy data}
+#this doesn't work because not comma-separated!
+buoy<-readr::read_csv(buoy_url)
+
+#this works
+buoy<-read_table2(buoy_url)
+```
+
+#Wrangle!
+
+```{r}
+#overwrite column names
+names(buoy)<-str_c(
+  names(buoy),
+  buoy%>%filter(`#YY`=="#yr"),sep="_")
+names(buoy)
+
+#2. clean up the slashes, get rid of '#' and '/'
+
+names(buoy)<-str_replace_all(names(buoy),'#','')
+
+names(buoy)
+
+head(buoy)
+#3.remove redudant row
+buoy<-buoy %>% filter(`YY_yr` != "#yr")
+
+```
+#Explore!
+
+```{r}
+ggplot(buoy,aes(WTMP_degC))+geom_bar()
+```
+
+#Join!
+
+```{r}
+head(benthic)
+head(buoy)
+
+#unite buoy dates
+buoy<-buoy%>%unite(date,c(YY_yr,MM_mo,DD_dy), sep='-')
+head(buoy)
+buoy$date
+
+#left-join benthic by date
+bb_join<-benthic%>%left_join(buoy, by="date")
+
+bb_join%>%select(id_name,x,y,date,hh_hr,mm_mn,WTMP_degC)%>%head()
+```
+
+
+```{r}
+
+```
